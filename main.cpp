@@ -172,35 +172,39 @@ public:
     std::string argsStr = "";
 
     for (const auto &arg : exeArgs) {
-      argsStr += arg + " ";
+      argsStr += arg + (&exeArgs.back() == &arg ? "" : " ");
     }
 
-    std::string envStr = "(export ";
+    std::string envStr = "";
 
-    for (const auto &entry : env) {
-      envStr += entry.first + "=\"" + entry.second + "\" ";
+    if (env.size() > 0) {
+      envStr = "(export ";
+      for (const auto &entry : env) {
+        envStr += entry.first + "=\"" + entry.second + "\" ";
+      }
+      envStr += "&& ";
     }
 
-    envStr += "&& ";
-
-    std::string shellCmd = envStr + exePath + " " + argsStr + ")";
+    const std::string shellCmd = exePath + " " + argsStr;
+    std::string shellCmdEnv =
+        env.size() > 0 ? envStr + shellCmd + ")" : shellCmd;
 
     if (DEBUG)
-      std::cout << "shellCmd: " << shellCmd << "\n";
+      std::cout << "shellCmd: \"" << shellCmdEnv << "\"\n";
 
     // run a process and create a streambuf that reads its stdout and stderr
-    redi::ipstream proc(shellCmd,
+    redi::ipstream proc(shellCmdEnv,
                         redi::pstreams::pstdout | redi::pstreams::pstderr);
     std::string line;
     // read child's stdout
     while (std::getline(proc.out(), line))
-      std::cout << "stdout: " << line << '\n';
+      std::cout << (DEBUG ? "stdout: " : "") << line << '\n';
     // if reading stdout stopped at EOF then reset the state:
     if (proc.eof() && proc.fail())
       proc.clear();
     // read child's stderr
     while (std::getline(proc.err(), line))
-      std::cerr << "stderr: " << line << '\n';
+      std::cerr << (DEBUG ? "stderr: " : "") << line << '\n';
     // ...
 
     return {""};

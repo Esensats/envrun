@@ -12,7 +12,7 @@ endif
 RM := rm -f
 CXXFLAGS := -g -Wall -Wextra -std=c++20
 LDFLAGS := -g
-LDLIBS := 
+LDLIBS :=
 
 # Platform specific variables
 EXEC_EXT := $(if $(findstring Windows_NT,$(OS)),.exe,)
