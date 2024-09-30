@@ -175,25 +175,19 @@ public:
       argsStr += arg + (&exeArgs.back() == &arg ? "" : " ");
     }
 
-    std::string envStr = "";
-
     if (env.size() > 0) {
-      envStr = "(export ";
       for (const auto &entry : env) {
-        envStr += entry.first + "=\"" + entry.second + "\" ";
+        setenv(entry.first.c_str(), entry.second.c_str(), 1);
       }
-      envStr += "&& ";
     }
 
     const std::string shellCmd = exePath + " " + argsStr;
-    std::string shellCmdEnv =
-        env.size() > 0 ? envStr + shellCmd + ")" : shellCmd;
 
     if (DEBUG)
-      std::cout << "shellCmd: \"" << shellCmdEnv << "\"\n";
+      std::cout << "shellCmd: \"" << shellCmd << "\"\n";
 
     // run a process and create a streambuf that reads its stdout and stderr
-    redi::ipstream proc(shellCmdEnv,
+    redi::ipstream proc(shellCmd,
                         redi::pstreams::pstdout | redi::pstreams::pstderr);
     std::string line;
     // read child's stdout
@@ -205,7 +199,6 @@ public:
     // read child's stderr
     while (std::getline(proc.err(), line))
       std::cerr << (DEBUG ? "stderr: " : "") << line << '\n';
-    // ...
 
     return {""};
   }
@@ -224,5 +217,9 @@ int main(int argc, char const *argv[]) {
   root.addSubcommand("run", std::make_unique<RunProcessCommand>());
 
   std::vector<std::string> args(argv + 1, argv + argc);
-  root.run(args);
+  const auto &result = root.run(args);
+  if (result.error.size() > 0) {
+    return 1;
+  }
+  return 0;
 }
