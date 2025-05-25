@@ -10,7 +10,7 @@ $(error "No $(CXX) in PATH, consider installing g++ or changing the CXX variable
 endif
 
 RM := rm -f
-CXXFLAGS := -g -Wall -Wextra -std=c++20
+CXXFLAGS := -g -Wall -Wextra -std=c++23
 LDFLAGS := -g
 LDLIBS :=
 

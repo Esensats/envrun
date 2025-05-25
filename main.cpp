@@ -1,9 +1,11 @@
 #include <cstdlib>
+#include <format>
 #include <iostream>
 #include <map>
 #include <memory>
 #include <pstream.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 struct RunResult {
@@ -21,28 +23,42 @@ using Commands = std::unordered_map<std::string, std::unique_ptr<Command>>;
 class Command {
 public:
   Command() = default;
-  Command(const std::string &name) : name(name) {}
+  Command(const std::vector<std::string> &aliases) {
+    this->setAliases(aliases);
+  }
   virtual ~Command() = default;
   virtual std::string description() const = 0;
   virtual std::string help() const { return this->description(); }
   virtual RunResult run(const std::vector<std::string> &args) = 0;
 
-  void addSubcommand(const std::string &name,
+  // Add a subcommand with a single alias
+  void addSubcommand(const std::string &alias,
+                     std::unique_ptr<Command> command) {
+    command->setAliases({alias});
+    subcommands[alias] = std::move(command);
+  }
+
+  // Add a subcommand with multiple aliases
+  void addSubcommand(const std::vector<std::string> &aliases,
                      std::shared_ptr<Command> command) {
-    command->setName(name);
-    subcommands[name] = command;
+    command->setAliases(aliases);
+    for (const auto &alias : aliases) {
+      subcommands[alias] = command;
+    }
   }
 
   CommandsShared &getSubcommands() { return subcommands; }
-  std::string getName() const { return name; }
+  std::vector<std::string> getAliases() const { return aliases; }
 
 protected:
-  void setName(const std::string &name) { this->name = name; }
-  std::string name;
+  void setAliases(const std::vector<std::string> &aliases) {
+    this->aliases = aliases;
+  }
+  std::vector<std::string> aliases;
   CommandsShared subcommands;
 
-  CommandOptions readOptions(const std::vector<std::string> &args,
-                             const std::string &prefixKey) {
+  static CommandOptions readOptions(const std::vector<std::string> &args,
+                                    const std::string &prefixKey) {
     int firstOptionIndex = -1;
     CommandOptions options;
     for (int i = 0; i < (int)args.size(); i++) {
@@ -71,6 +87,22 @@ protected:
           args.begin(), args.begin() + firstOptionIndex);
     }
     return options;
+  }
+
+  static std::vector<std::string>
+  readOptionValues(const CommandOptions &options,
+                   const std::vector<std::string> &keyAliases) {
+    std::cout << "a1";
+    for (const auto &key : keyAliases) {
+      std::cout << "a_for_" << key;
+      auto it = options.find(key);
+      if (it != options.end()) {
+        std::cout << "a2";
+        return it->second;
+      }
+    }
+    std::cout << "a3";
+    return {};
   }
 };
 
@@ -111,10 +143,6 @@ public:
 class HelpCommand : public Command {
 public:
   HelpCommand(const CommandsShared &commands) : commands(commands) {}
-  HelpCommand(const CommandsShared &commands, std::string name)
-      : commands(commands) {
-    setName(name);
-  }
 
   std::string description() const override { return "Prints the help message"; }
 
@@ -122,9 +150,20 @@ public:
     (void)args;
     std::cout << "Package for running apps with environment variables\n";
     std::cout << "Available commands:\n";
-    for (const auto &command : commands) {
-      std::cout << command.second->getName() << ": "
-                << command.second->description() << "\n";
+    std::unordered_set<std::shared_ptr<Command>> uniqueCommands;
+    for (const auto &[key, command] : commands) {
+      uniqueCommands.insert(command);
+    }
+    for (const auto &command : uniqueCommands) {
+      const auto &aliases = command->getAliases();
+      std::string aliasesStr = "";
+      for (const auto &alias : aliases) {
+        aliasesStr += alias + (&aliases.back() == &alias ? "" : ", ");
+      }
+      // std::cout << std::setw(20) << std::right << aliasesStr
+      //           << command->description() << "\n";
+      std::cout << std::format("  {:<15} | {}\n", aliasesStr,
+                               command->description());
     }
     return {""};
   }
@@ -136,19 +175,21 @@ private:
 class RunProcessCommand : public Command {
 public:
   std::string description() const override {
-    return "Runs a child process with the configured env variables";
+    return "Runs a shell command with the configured env variables";
   }
 
   RunResult run(const std::vector<std::string> &args) override {
-    auto options = readOptions(args, "path");
+    CommandOptions options = readOptions(args, "path");
 
-    if (options["path"].size() != 1 || options["-e"].size() % 2 != 0) {
-      std::cerr << "Usage: " << this->getName()
+    if (!options.contains("path") || options["path"].empty() ||
+        options["-e"].size() % 2 != 0) {
+      std::cerr << "Usage: " << this->getAliases()[0]
                 << " <path> [-e (<key> <value>)...] [-- <args>...]\n";
       return {"Invalid arguments"};
     }
 
     std::string exePath = options["path"][0];
+
     std::vector<std::string> exeArgs = options["--"];
     std::unordered_map<std::string, std::string> env;
     for (int i = 0; i < (int)options["-e"].size(); i += 2) {
@@ -206,15 +247,14 @@ public:
 
 int main(int argc, char const *argv[]) {
   RootCommand root;
-  root.addSubcommand("--version", std::make_unique<VersionCommand>());
-  root.addSubcommand("-v", std::make_unique<VersionCommand>());
-  std::shared_ptr<HelpCommand> helpCommand =
-      std::make_shared<HelpCommand>(root.getSubcommands(), "help");
-  root.addSubcommand("--help", helpCommand);
-  root.addSubcommand("-h", helpCommand);
-  root.addSubcommand("help", helpCommand);
-  helpCommand->addSubcommand("run", std::make_shared<RunProcessCommand>());
-  root.addSubcommand("run", std::make_unique<RunProcessCommand>());
+
+  root.addSubcommand({"-c", "--command"},
+                     std::make_shared<RunProcessCommand>());
+
+  root.addSubcommand({"-v", "--version"}, std::make_shared<VersionCommand>());
+
+  root.addSubcommand({"-h", "--help"},
+                     std::make_shared<HelpCommand>(root.getSubcommands()));
 
   std::vector<std::string> args(argv + 1, argv + argc);
   const auto &result = root.run(args);

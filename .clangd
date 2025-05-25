@@ -1,4 +1,4 @@
 CompileFlags: # Tweak the parse settings, example directory given to show format
   Add:
     - "--include-directory=./include" # e.g `-I/usr/include/SDL2`  suggested from @Palmkeep
-    - "-std=c++20"
+    - "-std=c++23"

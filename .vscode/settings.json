@@ -1,0 +1,9 @@
+{
+  "makefile.launchConfigurations": [
+    {
+      "cwd": "/home/esensats/dev/envrun/bin",
+      "binaryPath": "/home/esensats/dev/envrun/bin/envrun",
+      "binaryArgs": []
+    }
+  ]
+}
