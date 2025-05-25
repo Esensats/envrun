@@ -4,3 +4,4 @@ temp/
 *.o
 *.d
 *.exe
+.vscode/
