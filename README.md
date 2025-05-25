@@ -2,6 +2,10 @@
 
 A lightweight C++ command-line tool for running applications with custom environment variables.
 
+Only works in POSIX-like environments (Linux, macOS, WSL, MINGW, etc.).
+
+The reason is the use of the PStreams library, which is designed for POSIX systems and provides a simple interface for process management and I/O redirection.
+
 ## Description
 
 `envrun` allows you to execute shell commands with a custom set of environment variables without permanently modifying your system environment. This is particularly useful for:
@@ -18,7 +22,6 @@ A lightweight C++ command-line tool for running applications with custom environ
 - Support for passing arguments to the target application
 - Real-time output streaming (stdout and stderr)
 - Debug mode for troubleshooting
-- Cross-platform compatible (Linux, macOS, Windows)
 
 ## Requirements
 
